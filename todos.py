@@ -33,6 +33,8 @@ def green(text: str) -> str:
     return GREEN + text + RESET
 
 
+# The following MapReduce script is for extracting Markdown TODOs in the notes collection (looking at checkboxes `[ ]`)
+# and conver them as todo item
 map_step = LuaScript(
     """
 -- Python equivalent to splitlines
@@ -96,6 +98,7 @@ class TodoItem:
 
     @property
     def todo_color(self) -> str:
+        """Add some bash coloring based on the priority and add the source tag (task or note)."""
         todo = self.todo
 
         # Add color for the prioritized tasks
@@ -147,18 +150,20 @@ class TodoItem:
             return 1
 
 
-def list_todos(tasks_col, col) -> List[TodoItem]:
+def list_todos(tasks_col, col, as_of) -> List[TodoItem]:
+    """Combine and sort todo items (using the MapReduce and querying the tasks collection."""
     todos = []
 
     # 1. Perform a MapReduce to fetch TODOs from the notes
-    mr = col.map_reduce(map_step, reduce_step)
-    for _id, raw_todos in mr["todos"].items():
-        for todo in raw_todos["todos"]:
-            todos.append(TodoItem(_id, todo, raw_todos["version"]))
+    mr = col.map_reduce(map_step, reduce_step, as_of=as_of)
+    if "todos" in mr:
+        for _id, raw_todos in mr["todos"].items():
+            for todo in raw_todos["todos"]:
+                todos.append(TodoItem(_id, todo, raw_todos["version"]))
 
     # 2. Fetch TODOs from the tasks
     for task in tasks_col.query(
-        Q["done"] == False
+        Q["done"] == False, as_of=as_of
     ):  # noqa  # PEP8 does not like the `== False`
         todos.append(
             TodoItem(
@@ -172,10 +177,10 @@ def list_todos(tasks_col, col) -> List[TodoItem]:
     return sorted(todos, key=lambda d: (d.p, d.raw_version), reverse=True)
 
 
-def filter_todos(tasks_col, col, q: str) -> List[TodoItem]:
+def filter_todos(tasks_col, col, as_of: str, q: str) -> List[TodoItem]:
     """Performs a basic text match."""
     todos = []
-    for todo in list_todos(tasks_col, col):
+    for todo in list_todos(tasks_col, col, as_of):
         if q in todo.todo:
             todos.append(todo)
 
@@ -184,7 +189,7 @@ def filter_todos(tasks_col, col, q: str) -> List[TodoItem]:
 
 def select_todo(tasks_col, col, short_id: str) -> Optional[TodoItem]:
     """Returns the first todo that which ID match the short ID (short prefix)."""
-    for todo in list_todos(tasks_col, col):
+    for todo in list_todos(tasks_col, col, ""):
         if todo.id.startswith(short_id):
             return todo
 
@@ -215,10 +220,13 @@ Usage:
 def main() -> None:  # noqa: C901
     """CLI interface."""
     cli_args = sys.argv[1:]
+
+    # Check if the help is requested
     if len(cli_args) == 1 and cli_args[0] in ["--help", "-h"]:
         help()
         return
 
+    # Config check
     CONFIG_FILE = Path("~/.config/todos.yaml").expanduser()
     try:
         with CONFIG_FILE.open() as f:
@@ -227,16 +235,24 @@ def main() -> None:  # noqa: C901
         print(f"Please create config file at {CONFIG_FILE}")
         return
 
+    # Setup
     client = DocStoreClient(base_url=config["base_url"], api_key=config["api_key"])
     col = client[config["notes_col"]]
     tasks_col = client[config["todos_col"]]
+    as_of = ""
+
+    # Extract the "as_of", if any
+    for i, arg in enumerate(cli_args.copy()):
+        if arg.startswith("asof:"):
+            as_of = arg.replace("asof:", "")
+            cli_args.pop(i)
 
     # List tasks when no args are given
     if not cli_args:
-        for todo in list_todos(tasks_col, col):
+        for todo in list_todos(tasks_col, col, as_of):
             print(f"{todo.id}\t{todo.date}\t{todo.todo_color}")
     elif len(cli_args) == 1:
-        for todo in filter_todos(tasks_col, col, cli_args[0]):
+        for todo in filter_todos(tasks_col, col, as_of, cli_args[0]):
             print(f"{todo.id}\t{todo.date}\t{todo.todo_color}")
 
     # Adding a new task
@@ -260,6 +276,7 @@ def main() -> None:  # noqa: C901
             print(f"No task matching id {short_id!r}")
             return
 
+        # The task was extracted from a note
         if todo.raw_todo["line"]:
             # From the note collection
             note = col.get_by_id(todo._id)
@@ -271,10 +288,11 @@ def main() -> None:  # noqa: C901
             note["content"] = "\r\n".join(lines)
             col.update(note)
         else:
-            # From the tasks collection
+            # It's coming from the tasks collection
             task = tasks_col.get_by_id(todo._id)
             task["done"] = True
             tasks_col.update(task)
+
         print(green(f"Task {todo.id} done"))
 
     # Display the help
