@@ -6,7 +6,7 @@ setup(
     py_modules=["todos"],
     install_requires=[
         "pyyaml",
-        "blobstash @  git+ssh://git@github.com/tsileo/blobstash-python",
+        "blobstash @  git+https://git@github.com/tsileo/blobstash-python",
     ],
     entry_points={"console_scripts": ["todos = todos:main"]},
 )
