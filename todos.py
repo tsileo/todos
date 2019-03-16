@@ -1,5 +1,7 @@
 from typing import List
 from typing import Optional
+from typing import Dict
+from typing import Any
 import sys
 from pathlib import Path
 from dataclasses import dataclass
@@ -11,6 +13,7 @@ from blobstash.docstore import DocStoreClient
 from blobstash.docstore import LuaScript
 from blobstash.docstore import Q
 
+CURRENT_YEAR = datetime.now().year
 
 RED = "\033[1;31m"
 GREEN = "\033[0;32m"
@@ -30,9 +33,8 @@ def green(text: str) -> str:
     return GREEN + text + RESET
 
 
-current_year = datetime.now().year
-
-map_step = LuaScript("""
+map_step = LuaScript(
+    """
 -- Python equivalent to splitlines
 function splitlines(s)
   if s:sub(-1)~="\\n" then s=s.."\\n" end
@@ -55,9 +57,11 @@ return function(doc)
     l = l + 1
   end
 end
-""")
+"""
+)
 
-reduce_step = LuaScript("""
+reduce_step = LuaScript(
+    """
 -- group the TODO items by document ID
 return function(key, vs)
   local out = {}
@@ -72,13 +76,14 @@ return function(key, vs)
   end
   return out
 end
-""")
+"""
+)
 
 
 @dataclass
 class TodoItem:
     _id: str
-    raw_todo: str
+    raw_todo: Dict[str, Any]
     raw_version: str
 
     @property
@@ -105,7 +110,7 @@ class TodoItem:
                 return f"[note]\t\t{todo}"
 
             # Cut the title if it's too long
-            title = self.raw_todo['note_title']
+            title = self.raw_todo["note_title"]
             if len(title) > 15:
                 title = title[:12] + "..."
             return f"{title}\t{todo}"
@@ -127,7 +132,7 @@ class TodoItem:
 
     @property
     def date(self) -> str:
-        if self.version.year != current_year:
+        if self.version.year != CURRENT_YEAR:
             return self.version.strftime("%Y-%m-%d @ %H:%M")
 
         return self.version.strftime("%b %d @ %H:%M")
@@ -152,8 +157,16 @@ def list_todos(tasks_col, col) -> List[TodoItem]:
             todos.append(TodoItem(_id, todo, raw_todos["version"]))
 
     # 2. Fetch TODOs from the tasks
-    for task in tasks_col.query(Q["done"] == False):  # noqa  # PEP8 does not like the `== False`
-        todos.append(TodoItem(task["_id"].id(), {"text": task["action"], "line": None}, task["_id"].version()))
+    for task in tasks_col.query(
+        Q["done"] == False
+    ):  # noqa  # PEP8 does not like the `== False`
+        todos.append(
+            TodoItem(
+                task["_id"].id(),
+                {"text": task["action"], "line": None},
+                task["_id"].version(),
+            )
+        )
 
     # Returns the todo sorted by most recent
     return sorted(todos, key=lambda d: (d.p, d.raw_version), reverse=True)
@@ -162,7 +175,7 @@ def list_todos(tasks_col, col) -> List[TodoItem]:
 def filter_todos(tasks_col, col, q: str) -> List[TodoItem]:
     """Performs a basic text match."""
     todos = []
-    for todo in list_todos(col):
+    for todo in list_todos(tasks_col, col):
         if q in todo.todo:
             todos.append(todo)
 
@@ -171,7 +184,7 @@ def filter_todos(tasks_col, col, q: str) -> List[TodoItem]:
 
 def select_todo(tasks_col, col, short_id: str) -> Optional[TodoItem]:
     """Returns the first todo that which ID match the short ID (short prefix)."""
-    for todo in list_todos(col):
+    for todo in list_todos(tasks_col, col):
         if todo.id.startswith(short_id):
             return todo
 
@@ -179,7 +192,8 @@ def select_todo(tasks_col, col, short_id: str) -> Optional[TodoItem]:
 
 
 def help() -> None:
-    print("""todos - Task system powered by BlobStash Docstore and Markdown notes.
+    print(
+        """todos - Task system powered by BlobStash Docstore and Markdown notes.
 
 Usage:
     # add a new todo
@@ -194,7 +208,8 @@ Usage:
     # mark as done (the full ID is not needed, just input the first letter, even one letter is enough)
     $ todos <idprefix> done
 
-""")
+"""
+    )
 
 
 def main() -> None:  # noqa: C901
@@ -226,11 +241,8 @@ def main() -> None:  # noqa: C901
 
     # Adding a new task
     elif cli_args[0] == "add":
-        todo = " ".join(cli_args[1:]).strip()
-        tasks_col.insert({
-            "action": todo,
-            "done": False,
-        })
+        todo_text = " ".join(cli_args[1:]).strip()
+        tasks_col.insert({"action": todo_text, "done": False})
         print(green("Task added"))
 
     # Actions on a specific todo
@@ -241,7 +253,9 @@ def main() -> None:  # noqa: C901
             return
 
         # Mark a todo as done
-        todo = select_todo(tasks_col, col, short_id)
+        todo = select_todo(  # type: ignore  # Mypy does not like the re-assignment
+            tasks_col, col, short_id
+        )
         if not todo:
             print(f"No task matching id {short_id!r}")
             return
@@ -251,7 +265,9 @@ def main() -> None:  # noqa: C901
             note = col.get_by_id(todo._id)
             lines = note["content"].splitlines()
 
-            lines[todo.raw_todo["line"]-1] = lines[todo.raw_todo["line"]-1].replace("[ ]", "[x]")
+            lines[todo.raw_todo["line"] - 1] = lines[todo.raw_todo["line"] - 1].replace(
+                "[ ]", "[x]"
+            )
             note["content"] = "\r\n".join(lines)
             col.update(note)
         else:
