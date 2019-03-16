@@ -232,7 +232,7 @@ def main() -> None:  # noqa: C901
         with CONFIG_FILE.open() as f:
             config = yaml.load(f, Loader=yaml.SafeLoader)
     except FileNotFoundError:
-        print(f"Please create config file at {CONFIG_FILE}")
+        print(f"Please create config file at {CONFIG_FILE}. 😾")
         return
 
     # Setup
@@ -249,8 +249,11 @@ def main() -> None:  # noqa: C901
 
     # List tasks when no args are given
     if not cli_args:
-        for todo in list_todos(tasks_col, col, as_of):
+        todos = list_todos(tasks_col, col, as_of)
+        for todo in todos:
             print(f"{todo.id}\t{todo.date}\t{todo.todo_color}")
+        if not todos:
+            print(green("All done! 😸"))
     elif len(cli_args) == 1:
         for todo in filter_todos(tasks_col, col, as_of, cli_args[0]):
             print(f"{todo.id}\t{todo.date}\t{todo.todo_color}")
@@ -259,13 +262,13 @@ def main() -> None:  # noqa: C901
     elif cli_args[0] == "add":
         todo_text = " ".join(cli_args[1:]).strip()
         tasks_col.insert({"action": todo_text, "done": False})
-        print(green("Task added"))
+        print(green("Task added. 😸"))
 
     # Actions on a specific todo
     elif len(cli_args) == 2:
         short_id, action = cli_args
         if action not in ["done"]:
-            print(f"Action {action!r} is an invalid")
+            print(f"Action {action!r} is an invalid. 🙀")
             return
 
         # Mark a todo as done
@@ -273,7 +276,7 @@ def main() -> None:  # noqa: C901
             tasks_col, col, short_id
         )
         if not todo:
-            print(f"No task matching id {short_id!r}")
+            print(f"No task matching id {short_id!r}. 🙀")
             return
 
         # The task was extracted from a note
@@ -293,7 +296,7 @@ def main() -> None:  # noqa: C901
             task["done"] = True
             tasks_col.update(task)
 
-        print(green(f"Task {todo.id} done"))
+        print(green(f"Task {todo.id} done. 😸"))
 
     # Display the help
     else:

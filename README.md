@@ -10,8 +10,11 @@ Uses [BlobStash](http://github.com/tsileo/blobstash) as backend.
 
 ## Features
 
+ - You get to see cats 😻
  - Tasks created from the CLI are stored inside a special DocStore collections
  - Extract Markdown TODOs (like `[ ] item`) directly from other DocStore collections
+ - Basic prioritazion support (just add `p:H` or `p:M` to attach priority, default is low (L)), with colorized bash output
+ - Support time-travel listing (using `asof:YYYY-MM-DD` and other formats)
 
 ## Install
 
