@@ -1,0 +1,4 @@
+base_url: 'http://localhost:8050'
+api_key: '123'
+notes_col: 'test'
+todos_col: 'todos_cli'
