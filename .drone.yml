@@ -1,0 +1,10 @@
+kind: pipeline
+name: default
+steps:
+  - name : lint
+    image: python:3
+    commands:
+      - pip install black flake8 mypy
+      - black --check .
+      - flake8 todos.py
+      - mypy --ignore-missing-imports todos.py

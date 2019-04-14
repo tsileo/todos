@@ -1,6 +1,6 @@
 # todos
 
-<a href="https://travis-ci.org/tsileo/todos"><img src="https://travis-ci.org/tsileo/todos.svg?branch=master" alt="Build Status"></a>
+<a href="https://d.a4.io/tsileo/todos"><img src="https://d.a4.io/api/badges/tsileo/todos/status.svg" alt="Build Status"></a>
 <a href="https://github.com/tsileo/todos/blob/master/LICENSE"><img src="https://img.shields.io/badge/license-ISC-red.svg?style=flat" alt="License"></a>
 <a href="https://github.com/ambv/black"><img alt="Code style: black" src="https://img.shields.io/badge/code%20style-black-000000.svg"></a>
 
