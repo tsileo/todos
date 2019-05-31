@@ -89,6 +89,12 @@ class TodoItem:
     raw_version: str
 
     @property
+    def todo_flat(self) -> str:
+        if "note_title" in self.raw_todo:
+            return f"{self.todo} {self.raw_todo['note_title']}"
+        return self.todo
+
+    @property
     def todo(self) -> str:
         """Remove everyting before the checkbox."""
         if self.raw_todo["line"]:
@@ -181,7 +187,7 @@ def filter_todos(tasks_col, col, as_of: str, q: str) -> List[TodoItem]:
     """Performs a basic text match."""
     todos = []
     for todo in list_todos(tasks_col, col, as_of):
-        if q in todo.todo:
+        if q in todo.todo_flat:
             todos.append(todo)
 
     return todos
